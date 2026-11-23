@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+  <title>HAR timing report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      color: #172534;
+      background: #f0f5f7;
+      font: 16px/1.5 system-ui, sans-serif;
+    }
+    body { margin: 0; }
+    main { width: min(1050px, calc(100% - 32px)); margin: 48px auto; }
+    h1 { margin: 0; font-size: clamp(2rem, 6vw, 3.25rem); line-height: 1.1; letter-spacing: -.045em; }
+    h2 { margin: 0; font-size: 1.2rem; font-weight: 650; }
+    p { color: #4a5c6b; margin: 10px 0; }
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(134px, 1fr)); gap: 12px; margin: 28px 0; }
+    .summary div { padding: 14px 16px; border: 1px solid #d1dfe5; border-radius: 10px; background: #fff; }
+    dt { font-size: .85rem; color: #4a5c6b; }
+    dd { margin: 3px 0 0; font-size: 1.4rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+    .panel { background: #fff; border: 1px solid #d1dfe5; border-radius: 12px; }
+    .panel header { padding: 16px 18px; }
+    .scroll { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; min-width: 720px; text-align: left; font-size: .9rem; }
+    th, td { border-top: 1px solid #e0e9ed; padding: 10px 14px; white-space: nowrap; }
+    th { color: #435867; font-weight: 600; background: #f7fafb; }
+    td { font-variant-numeric: tabular-nums; }
+    th.timeline { min-width: 180px; width: 32%; }
+    .axis { display: flex; justify-content: space-between; gap: 8px; }
+    .track { position: relative; height: 14px; overflow: hidden; border-radius: 3px;
+      background: repeating-linear-gradient(to right, #edf3f6 0, #edf3f6 calc(25% - 1px), #d4e0e6 calc(25% - 1px), #d4e0e6 25%); }
+    .bar { position: absolute; top: 2px; height: 10px; min-width: 2px; border-radius: 3px; background: #08736d; }
+    .bar.error { background: #b72e44; }
+    .bar.missing { background: #566c7d; }
+    .status.error { color: #a42436; font-weight: 700; }
+    footer { font-size: .87rem; margin-top: 18px; }
+    @media (max-width: 550px) { main { margin-top: 28px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>HAR timing report</h1>
+      <p>{{.Summary.Requests}} requests across {{.Summary.Origins}} known HTTP origins. Showing {{len .Rows}} requests.</p>
+    </header>
+    <dl class="summary">
+      <div><dt>HTTP 4xx</dt><dd>{{.Summary.ClientErrors}}</dd></div>
+      <div><dt>HTTP 5xx</dt><dd>{{.Summary.ServerErrors}}</dd></div>
+      <div><dt>Missing status</dt><dd>{{.Summary.NoHTTPStatus}}</dd></div>
+      <div><dt>p50 duration (ms)</dt><dd>{{ms .Summary.P50MS}}</dd></div>
+      <div><dt>p95 duration (ms)</dt><dd>{{ms .Summary.P95MS}}</dd></div>
+    </dl>
+    {{if .Rows}}
+    <section class="panel" aria-labelledby="requests-title">
+      <header>
+        <h2 id="requests-title">{{if eq .Order "start"}}Requests by start time{{else}}Requests by duration{{end}}</h2>
+      </header>
+      <div class="scroll" role="region" aria-label="Request timing table" tabindex="0">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">#</th><th scope="col">Origin</th><th scope="col">Endpoint</th><th scope="col">Method</th>
+              <th scope="col">Status</th><th scope="col">Start (ms)</th><th scope="col">Total (ms)</th><th scope="col">Wait (ms)</th>
+              <th scope="col" class="timeline"><div class="axis"><span>0 ms</span><span>{{.EndMS}} ms</span></div></th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .Rows}}
+            <tr>
+              <td>{{.Ordinal}}</td><td>{{.Origin}}</td><td>{{.Endpoint}}</td><td>{{.Method}}</td>
+              <td class="status {{.Kind}}">{{.StatusLabel}}</td><td>{{ms .StartMS}}</td><td>{{ms .TotalMS}}</td><td>{{ms .Phases.WaitMS}}</td>
+              <td>{{if .Plottable}}<div class="track" aria-hidden="true"><div class="bar {{.Kind}}" style="left: {{.Left}}%; width: {{.Width}}%"></div></div>{{else}}—{{end}}</td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {{end}}
+    <footer><p>Aliases are local to this capture. Times are relative to the first captured request with a valid time.</p></footer>
+  </main>
+</body>
+</html>

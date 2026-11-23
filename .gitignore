@@ -1,0 +1,5 @@
+# Raw network captures may contain credentials or personal data.
+*.[hH][aA][rR]
+!examples/synthetic.har
+/har-timing-report
+/har-timing-report.exe
