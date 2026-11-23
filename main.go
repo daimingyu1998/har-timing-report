@@ -21,6 +21,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	format := flags.String("format", "markdown", "markdown, json, or html")
 	limit := flags.Int("limit", 15, "maximum requests to show (0 for all)")
 	order := flags.String("order", "slowest", "slowest or start")
+	baseline := flags.String("baseline", "", "compare with this HAR (markdown or json)")
 	usage := func(w io.Writer) {
 		fmt.Fprintln(w, "Usage: har-timing-report [options] <capture.har|->")
 		flags.SetOutput(w)
@@ -42,26 +43,24 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	input := stdin
-	if path := flags.Arg(0); path != "-" {
-		file, err := os.Open(path)
-		if err != nil {
-			fmt.Fprintln(stderr, "har-timing-report: cannot open input file")
-			return 1
+	path := flags.Arg(0)
+	if *baseline != "" {
+		if *format == "html" || (*baseline == "-" && path == "-") ||
+			*order != "slowest" || *limit != 15 {
+			fmt.Fprintln(stderr, "har-timing-report: comparison needs markdown or json, default row options, and at most one stdin capture")
+			usage(stderr)
+			return 2
 		}
-		defer file.Close()
-		input = file
+		return runComparison(*baseline, path, *format, stdin, stdout, stderr)
 	}
-	timingReport, err := report.Read(input, *order, *limit)
+	timingReport, err := readCapture(path, stdin, *order, *limit)
 	if err != nil {
 		fmt.Fprintln(stderr, "har-timing-report:", err)
 		return 1
 	}
 	switch *format {
 	case "json":
-		encoder := json.NewEncoder(stdout)
-		encoder.SetIndent("", "  ")
-		err = encoder.Encode(timingReport)
+		err = writeJSON(stdout, timingReport)
 	case "html":
 		err = timingReport.WriteHTML(stdout)
 	default:
@@ -69,6 +68,48 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if err != nil {
 		fmt.Fprintln(stderr, "har-timing-report: cannot write report")
+		return 1
+	}
+	return 0
+}
+
+func readCapture(path string, stdin io.Reader, order string, limit int) (report.Report, error) {
+	if path == "-" {
+		return report.Read(stdin, order, limit)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return report.Report{}, errors.New("cannot open input file")
+	}
+	defer file.Close()
+	return report.Read(file, order, limit)
+}
+
+func writeJSON(out io.Writer, value any) error {
+	encoder := json.NewEncoder(out)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(value)
+}
+
+func runComparison(baselinePath, currentPath, format string, stdin io.Reader, stdout, stderr io.Writer) int {
+	baseline, err := readCapture(baselinePath, stdin, "slowest", 0)
+	if err != nil {
+		fmt.Fprintln(stderr, "har-timing-report: baseline capture:", err)
+		return 1
+	}
+	current, err := readCapture(currentPath, stdin, "slowest", 0)
+	if err != nil {
+		fmt.Fprintln(stderr, "har-timing-report: current capture:", err)
+		return 1
+	}
+	comparison := report.Compare(baseline, current)
+	if format == "json" {
+		err = writeJSON(stdout, comparison)
+	} else {
+		err = comparison.WriteMarkdown(stdout)
+	}
+	if err != nil {
+		fmt.Fprintln(stderr, "har-timing-report: cannot write comparison")
 		return 1
 	}
 	return 0

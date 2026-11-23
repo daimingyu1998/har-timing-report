@@ -39,6 +39,17 @@ The output contains no hostnames, paths, headers, cookies, request or response b
 
 Review the generated report before sharing. Request order, status codes, relative timings, and repeated endpoint patterns can still reveal activity. Keep original captures local. The report omits the data needed to replay requests or reimport the capture into DevTools.
 
+## Compare two captures
+
+```sh
+./har-timing-report -baseline examples/synthetic.har examples/synthetic-regression.har
+./har-timing-report -baseline baseline.har -format json current.har > comparison.json
+```
+
+Comparison output contains capture-wide status counts and rates, plus p50 and p95 for the total request duration and each available timing phase. Changes are current minus baseline, in milliseconds for durations and percentage points for response rates. The sample shows p95 increasing from 842 ms to 1,442 ms and the 5xx rate increasing from 33.33% to 50.00%.
+
+Comparisons include sample counts and exclude missing measurements. A capture with zero requests has undefined response rates. Compare captures recorded under similar conditions, since traffic mix and cache state affect aggregate metrics. Comparisons work with Markdown or JSON and leave out request rows and aliases. Use `-` for at most one capture to read it from standard input.
+
 ## Development
 
 ```sh
@@ -46,6 +57,6 @@ go test ./...
 go vet ./...
 ```
 
-Use synthetic captures when reporting bugs. The next planned feature compares captures using aggregate metrics that do not require sharing endpoint names.
+Use synthetic captures when reporting bugs.
 
 Licensed under [MIT](LICENSE).
